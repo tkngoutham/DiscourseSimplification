@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 public class OutSentence {
     private int sentenceIdx;
     private String originalSentence;
+    private String simplifiedSentence;
     private HashMap<String, Element> elementMap; // all extractions extracted from this sentence
 
     // for deserialization
@@ -44,6 +45,14 @@ public class OutSentence {
         this.originalSentence = originalSentence;
         this.elementMap = new LinkedHashMap<>();
     }
+
+    public OutSentence(int sentenceIdx,String originalSentence,String simplifiedSentence) {
+        this.sentenceIdx = sentenceIdx;
+        this.originalSentence = originalSentence;
+        this.simplifiedSentence = simplifiedSentence;
+        this.elementMap = new LinkedHashMap<>();
+    }
+
 
     public void addElement(Element element) {
         if (sentenceIdx != element.getSentenceIdx()) {

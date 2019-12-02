@@ -43,11 +43,15 @@ import java.util.Optional;
 /**
  *
  */
-public class DiscourseSimplifier {
+public class DiscourseSimplifier implements Runnable {
     private final DiscourseTreeCreator discourseTreeCreator;
     private final DiscourseExtractor discourseExtractor;
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
+    String text;
+    ProcessingType type;
+    SimplificationContent contents;
+    String simplifiedSentence;
 
     public DiscourseSimplifier(Config config) {
         SentencePreprocessor preprocessor = new SentencePreprocessor(config);
@@ -62,94 +66,50 @@ public class DiscourseSimplifier {
         this(ConfigFactory.load().getConfig("discourse-simplification"));
     }
 
-    public SimplificationContent doDiscourseSimplification(File file, ProcessingType type) throws IOException {
-        return doDiscourseSimplification(file, type, false);
+    public DiscourseSimplifier(String text, ProcessingType type, String simplifiedSentence, SimplificationContent contents) {
+        this(ConfigFactory.load().getConfig("discourse-simplification"));
+        this.text=text;
+        this.type=type;
+        this.simplifiedSentence=simplifiedSentence;
+        this.contents=contents;
     }
 
-    public SimplificationContent doDiscourseSimplification(File file, ProcessingType type, boolean separateLines) throws IOException {
-        List<String> sentences = SentencesUtils.splitIntoSentencesFromFile(file, separateLines);
-        return doDiscourseSimplification(sentences, type);
+
+    public SimplificationContent doDiscourseSimplification(List<String> text,ProcessingType type){
+        return null;
     }
 
-    public SimplificationContent doDiscourseSimplification(String text, ProcessingType type) {
+
+    public void doDiscourseSimplification(String text, ProcessingType type, String simplifiedSentence,SimplificationContent content) {
         List<String> sentences = SentencesUtils.splitIntoSentences(text);
-        return doDiscourseSimplification(sentences, type);
-    }
-
-    public SimplificationContent doDiscourseSimplification(List<String> sentences, ProcessingType type) {
         if (type.equals(ProcessingType.SEPARATE)) {
-            return processSeparate(sentences);
-        } else if (type.equals(ProcessingType.WHOLE)) {
-            return processWhole(sentences);
+            processSeparate(sentences, simplifiedSentence, content);
         } else {
             throw new IllegalArgumentException("Unknown ProcessingType.");
         }
+        return;
     }
 
-    // creates one discourse discourse_tree over all sentences (investigates intra-sentential and inter-sentential relations)
-    private SimplificationContent processWhole(List<String> sentences) {
-        SimplificationContent content = new SimplificationContent();
-
-        // Step 1) create document discourse discourse_tree
-        logger.info("### STEP 1) CREATE DOCUMENT DISCOURSE TREE ###");
-        discourseTreeCreator.reset();
-        int idx = 0;
-        for (String sentence : sentences) {
-            logger.info("# Processing sentence {}/{} #", (idx + 1), sentences.size());
-            logger.info("'" + sentence + "'");
-
-            content.addSentence(new OutSentence(idx, sentence));
-
-            // extend discourse discourse_tree
-            try {
-                discourseTreeCreator.addSentence(sentence, idx);
-                discourseTreeCreator.update();
-                if (logger.isDebugEnabled()) {
-
-                    Optional.ofNullable(discourseTreeCreator.getLastSentenceTree())
-                            .ifPresent(t -> logger.debug(t.toString()));
-
-//                logger.debug(discourseTreeCreator.getDiscourseTree().toString()); // to show the current document discourse discourse_tree
-                }
-            } catch (ParseTreeException e) {
-                logger.error("Failed to process sentence: {}", sentence);
-            }
-
-            ++idx;
-        }
-
-        // Step 2) do discourse extraction
-        logger.info("### STEP 2) DO DISCOURSE EXTRACTION ###");
-        List<Element> elements = discourseExtractor.doDiscourseExtraction(discourseTreeCreator.getDiscourseTree());
-        elements.forEach(e -> content.addElement(e));
-        if (logger.isDebugEnabled()) {
-            logger.debug(content.toString());
-        }
-
-        logger.info("### FINISHED");
-        return content;
-    }
 
     // creates discourse trees for each individual sentence (investigates intra-sentential relations only)
-    private SimplificationContent processSeparate(List<String> sentences) {
-        SimplificationContent content = new SimplificationContent();
+    private void processSeparate(List<String> sentences,String simplifiedSentence, SimplificationContent content) {
 
         int idx = 0;
         for (String sentence : sentences) {
-            OutSentence outSentence = new OutSentence(idx, sentence);
+            OutSentence outSentence = new OutSentence(idx, sentence, simplifiedSentence);
 
-            logger.info("# Processing sentence {}/{} #", (idx + 1), sentences.size());
+            //logger.info("# Processing sentence {}/{} #", (idx + 1), sentences.size());
             logger.info("'" + sentence + "'");
 
             // Step 1) create sentence discourse tree
             logger.debug("### Step 1) CREATE SENTENCE DISCOURSE TREE ###");
             discourseTreeCreator.reset();
             try {
+                logger.debug(sentence);
                 discourseTreeCreator.addSentence(sentence, idx);
                 discourseTreeCreator.update();
-                if (logger.isDebugEnabled()) {
-                    logger.debug(discourseTreeCreator.getDiscourseTree().toString());
-                }
+                logger.debug("tree is "+discourseTreeCreator.getDiscourseTree().toString());
+
 
                 // Step 2) do discourse extraction
                 logger.debug("### STEP 2) DO DISCOURSE EXTRACTION ###");
@@ -167,6 +127,12 @@ public class DiscourseSimplifier {
         }
 
         logger.info("### FINISHED");
-        return content;
+        return;
+    }
+
+    @Override
+    public void run() {
+        doDiscourseSimplification(this.text,this.type,this.simplifiedSentence,this.contents);
+
     }
 }
